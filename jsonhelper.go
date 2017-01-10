@@ -8,10 +8,10 @@ import (
 	"strconv"
 )
 
-type NodeType int
+type nodeType int
 
 const (
-	_ NodeType = iota
+	_ nodeType = iota
 	tMap
 	tArray
 	tNum
@@ -258,7 +258,7 @@ func (n *nodeArray) ToString() (string, error) {
 
 //nodeValue
 type nodeValue struct {
-	t NodeType
+	t nodeType
 	v interface{}
 }
 
