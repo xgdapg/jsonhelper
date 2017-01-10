@@ -15,6 +15,7 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(n.Key("f").Index(1).ToInt())
+	fmt.Println(n.Key("b").Index(1).ToInt()) // 2 <nil>
+	fmt.Println(n.Key("f").Index(1).ToInt()) // 0 Key `f` not exist
 }
 ```
