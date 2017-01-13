@@ -52,7 +52,7 @@ func Parse(data []byte) (Node, error) {
 		}
 		return createNode(v)
 	}
-	return nil, errors.New("error")
+	return nil, errors.New("Invalid JSON format")
 }
 
 func createNode(i interface{}) (Node, error) {
@@ -60,27 +60,15 @@ func createNode(i interface{}) (Node, error) {
 	switch r.Kind() {
 	case reflect.Map:
 		n := &nodeMap{
-			v: map[string]Node{},
-		}
-		for k, v := range i.(map[string]interface{}) {
-			sn, err := createNode(v)
-			if err != nil {
-				return nil, err
-			}
-			n.v[k] = sn
+			v: i.(map[string]interface{}),
+			c: map[string]Node{},
 		}
 		return n, nil
 
 	case reflect.Array, reflect.Slice:
 		n := &nodeArray{
-			v: []Node{},
-		}
-		for _, v := range i.([]interface{}) {
-			sn, err := createNode(v)
-			if err != nil {
-				return nil, err
-			}
-			n.v = append(n.v, sn)
+			v: i.([]interface{}),
+			c: map[int]Node{},
 		}
 		return n, nil
 
@@ -106,7 +94,7 @@ func createNode(i interface{}) (Node, error) {
 		return n, nil
 
 	}
-	return nil, errors.New("error")
+	return nil, errors.New("Invalid data type")
 }
 
 //nodeError
@@ -158,12 +146,21 @@ func (n *nodeError) ToString() (string, error) {
 
 //nodeMap
 type nodeMap struct {
-	v map[string]Node
+	v map[string]interface{}
+	c map[string]Node //cache
 }
 
 func (n *nodeMap) Key(k string) Node {
+	if nd, ok := n.c[k]; ok {
+		return nd
+	}
 	if v, ok := n.v[k]; ok {
-		return v
+		node, err := createNode(v)
+		if err != nil {
+			return &nodeError{e: err}
+		}
+		n.c[k] = node
+		return node
 	}
 	return &nodeError{e: errors.New("Key `" + k + "` not exist")}
 }
@@ -179,7 +176,11 @@ func (n *nodeMap) IsBool() bool   { return false }
 func (n *nodeMap) IsString() bool { return false }
 
 func (n *nodeMap) ToMap() (map[string]Node, error) {
-	return n.v, nil
+	result := map[string]Node{}
+	for k := range n.v {
+		result[k] = n.Key(k)
+	}
+	return result, nil
 }
 
 func (n *nodeMap) ToArray() ([]Node, error) {
@@ -208,7 +209,8 @@ func (n *nodeMap) ToString() (string, error) {
 
 //nodeArray
 type nodeArray struct {
-	v []Node
+	v []interface{}
+	c map[int]Node //cache
 }
 
 func (n *nodeArray) Key(k string) Node {
@@ -216,8 +218,16 @@ func (n *nodeArray) Key(k string) Node {
 }
 
 func (n *nodeArray) Index(i int) Node {
+	if nd, ok := n.c[i]; ok {
+		return nd
+	}
 	if i >= 0 && i < len(n.v) {
-		return n.v[i]
+		node, err := createNode(n.v[i])
+		if err != nil {
+			return &nodeError{e: err}
+		}
+		n.c[i] = node
+		return node
 	}
 	return &nodeError{e: errors.New("Index `" + strconv.Itoa(i) + "` out of range")}
 }
@@ -233,7 +243,11 @@ func (n *nodeArray) ToMap() (map[string]Node, error) {
 }
 
 func (n *nodeArray) ToArray() ([]Node, error) {
-	return n.v, nil
+	result := []Node{}
+	for i := range n.v {
+		result = append(result, n.Index(i))
+	}
+	return result, nil
 }
 
 func (n *nodeArray) ToInt() (int, error) {
